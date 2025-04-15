@@ -3,9 +3,10 @@ pipeline {
 
     environment {
         // Define environment variables here
-        DOCKER_IMAGE = "your_docker_image_name"
-        REGISTRY = "your_docker_registry_url"
-        REGISTRY_CREDENTIALS = "your_registry_credentials_id"
+         DOCKER_IMAGE_NAME = "my-docker-image"
+        DOCKER_TAG = "latest"
+        // Temporary SSL workaround
+        GIT_SSL_NO_VERIFY = "1"
     }
 
     stages {
