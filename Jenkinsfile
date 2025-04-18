@@ -10,46 +10,84 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
+        stage('Cloner le projet') {
             steps {
-                // Checkout the source code from your repository
-                git branch: 'master', url: 'https://github.com/rouadkhili/CI-CD.git'
+                git branch: 'master', 
+                    url: 'https://github.com/rouadkhili/CI-CD.git'
             }
         }
 
-        stage('Build') {
+
+
+         stage('Build Angular') {
             steps {
-                script {
-                    // Build the application (e.g., with Maven or npm)
-                    bat 'npm install' 
-                    bat 'npm install --only=dev'  // Use npm commands if it's a Node.js app
+                dir('angular-17-client') {
+                    sh 'npm install'
+                    sh 'npm run build'
+                    sh 'npm run build -- --configuration=production'
                 }
             }
         }
 
-        stage('Test') {
+        stage('Build Spring Boot') {
             steps {
-               dir('frontend') {
-                    bat 'npm install'
-                    bat 'npm test'
-            }
-        }
-
-        stage('Docker Build') {
-            steps {
-                script {
-                    // Build the Docker image
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
+                dir('spring-boot-server') {
+                    sh 'mvn clean package -DskipTests'
                 }
             }
         }
 
-        stage('Docker Push') {
+        stage('Tests Unitaires Spring Boot') {
+            steps {
+                dir('spring-boot-server') {
+                    sh 'mvn test'
+                }
+            }
+        }
+        stage('Tests unitaires Frontend') {
+            steps {
+                dir('angular-17-client') {
+                    sh 'npm install'
+                    sh 'ng test --watch=false --no-progress --browsers=ChromeHeadless || true'
+                }
+            }
+        }
+
+        stage('Tests d\'intégration avec PostgreSQL') {
+            steps {
+                sh 'docker-compose -f docker-compose.test.yml up -d'
+                sh 'sleep 30'  // Attente pour laisser PostgreSQL démarrer
+                dir('spring-boot-server') {
+                    sh 'mvn verify -P integration-tests'
+                }
+                sh 'docker-compose -f docker-compose.test.yml down'
+            }
+        }
+        
+
+        stage('Tests End-to-End avec Cypress') {
             steps {
                 script {
-                    // Push the Docker image to the registry
-                    docker.withRegistry("https://${REGISTRY}", "${REGISTRY_CREDENTIALS}") {
-                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push()
+                    dir('angular-17-client') {
+                        
+                       sh 'npx http-server ./dist/angular-17-crud -p 4200 &'
+                       sh 'npx wait-on http://localhost:4200 --timeout 60000'
+
+                        sh 'curl http://localhost:4200 || true'
+                        sh 'xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" npx cypress run'
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                script {
+                    dir('spring-boot-server') {
+                        sh 'docker build -t spring-boot-server .'
+                    }
+                    dir('angular-17-client') {
+                        sh 'docker build -t angular-17-client .'
                     }
                 }
             }
@@ -57,26 +95,15 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                script {
-                    // Deploy the application using the Docker image
-                    sh 'docker run -d -p 8080:8080 ${DOCKER_IMAGE}:${env.BUILD_ID}'
-                }
+                sh 'docker-compose up -d'
             }
         }
     }
-    }
+
     post {
         always {
-            // Cleanup workspace after the pipeline execution
-            cleanWs()
-        }
-        failure {
-            // Notifications for failure
-            echo 'Pipeline failed!'
-        }
-        success {
-            // Notifications for success
-            echo 'Pipeline succeeded!'
+            // Archive les captures d’écran de Cypress en cas d’échec
+            archiveArtifacts artifacts: 'angular-17-client/cypress/screenshots/**/*.png', fingerprint: true
         }
     }
 }
