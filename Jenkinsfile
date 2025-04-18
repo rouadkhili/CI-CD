@@ -19,14 +19,7 @@ pipeline {
 
 
 
-         stage('Build Angular') {
-            steps {
-                dir('angular-17-client') {
-                    sh 'npm install'
-                    sh 'npm run build'
-                    sh 'npm run build -- --configuration=production'
-                }
-            }
+         
         }
 
         stage('Build Spring Boot') {
