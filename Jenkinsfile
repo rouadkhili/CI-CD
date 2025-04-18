@@ -19,7 +19,7 @@ pipeline {
 
     stage('Build Angular') {
             steps {
-                dir('angular-17-client') {
+                dir('frontend') {
                     sh 'npm install'
                     sh 'npm run build'
                     sh 'npm run build -- --configuration=production'
@@ -31,7 +31,7 @@ pipeline {
 
         stage('Build Spring Boot') {
             steps {
-                dir('spring-boot-server') {
+                dir('springboot-deploy') {
                     sh 'mvn clean package -DskipTests'
                 }
             }
@@ -39,14 +39,14 @@ pipeline {
 
         stage('Tests Unitaires Spring Boot') {
             steps {
-                dir('spring-boot-server') {
+                dir('springboot-deploy') {
                     sh 'mvn test'
                 }
             }
         }
         stage('Tests unitaires Frontend') {
             steps {
-                dir('angular-17-client') {
+                dir('frontend') {
                     sh 'npm install'
                     sh 'ng test --watch=false --no-progress --browsers=ChromeHeadless || true'
                 }
@@ -57,7 +57,7 @@ pipeline {
             steps {
                 sh 'docker-compose -f docker-compose.test.yml up -d'
                 sh 'sleep 30'  // Attente pour laisser PostgreSQL démarrer
-                dir('spring-boot-server') {
+                dir('springboot-deploy') {
                     sh 'mvn verify -P integration-tests'
                 }
                 sh 'docker-compose -f docker-compose.test.yml down'
@@ -68,7 +68,7 @@ pipeline {
         stage('Tests End-to-End avec Cypress') {
             steps {
                 script {
-                    dir('angular-17-client') {
+                    dir('frontend') {
                         
                        sh 'npx http-server ./dist/angular-17-crud -p 4200 &'
                        sh 'npx wait-on http://localhost:4200 --timeout 60000'
@@ -83,11 +83,11 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
-                    dir('spring-boot-server') {
-                        sh 'docker build -t spring-boot-server .'
+                    dir('springboot-deploy') {
+                        sh 'docker build -t springboot-deploy .'
                     }
-                    dir('angular-17-client') {
-                        sh 'docker build -t angular-17-client .'
+                    dir('frontend') {
+                        sh 'docker build -t frontend .'
                     }
                 }
             }
@@ -103,7 +103,7 @@ pipeline {
     post {
         always {
             // Archive les captures d’écran de Cypress en cas d’échec
-            archiveArtifacts artifacts: 'angular-17-client/cypress/screenshots/**/*.png', fingerprint: true
+            archiveArtifacts artifacts: 'frontend/cypress/screenshots/**/*.png', fingerprint: true
         }
     }
 }
