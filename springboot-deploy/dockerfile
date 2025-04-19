@@ -5,7 +5,6 @@ RUN mkdir -p /workspace
 WORKDIR /workspace
 COPY pom.xml /workspace
 COPY src /workspace/src
-RUN mvn -f pom.xml clean package
 
 FROM openjdk:17.0.12-jdk-alpine
 # Copier le fichier JAR du backend dans le container
